@@ -1,5 +1,7 @@
 # project-bot
 
+This bot is by Philip Schatz and can be found [here](https://github.com/philschatz/project-bot).
+
 [![code coverage][coverage-image]][coverage-url]
 [![travis status][travis-image]][travis-url]
 [![dependency status][dependency-image]][dependency-url]
