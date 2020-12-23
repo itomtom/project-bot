@@ -19,6 +19,19 @@ async function retryQuery (context, query, args) {
   }
 }
 
+// Move the automation card to the bottom
+async function updateRuleCard (context, afterId, cardId, columnId) {
+  if (afterId) {
+    await context.github.graphql(`
+    mutation moveCard($cardId: ID!, $columnId: ID!, $afterId: ID!) {
+      moveProjectCard(input: {cardId: $cardId, columnId: $columnId, afterCardId: $afterId}) {
+        clientMutationId
+      }
+    }
+  `, { cardId, columnId, afterId })
+  }
+}
+
 // Common GraphQL Fragment for getting the Automation Cards out of the bottom of every Column in a Project
 const PROJECT_FRAGMENT = `
   name
@@ -36,7 +49,7 @@ const PROJECT_FRAGMENT = `
           note
         }
       }
-      lastCards: cards(last: 1, archivedStates: NOT_ARCHIVED) {
+      lastCards: cards(last: 2, archivedStates: NOT_ARCHIVED) {
         totalCount
         nodes {
           url
@@ -107,7 +120,7 @@ module.exports = (robot) => {
         // Loop through all of the Automation Cards and see if any match
         const automationRules = extractAutomationRules(allProjects).filter(({ ruleName: rn }) => rn === ruleName)
 
-        for (const { column, ruleArgs } of automationRules) {
+        for (const { column, ruleArgs, lastCardId, cardId } of automationRules) {
           if (await ruleMatcher(logger, context, ruleArgs)) {
             logger.info(`Creating Card for "${issueUrl}" to column ${column.id} because of "${ruleName}" and value: "${ruleArgs}"`)
             await context.github.graphql(`
@@ -117,6 +130,9 @@ module.exports = (robot) => {
                 }
               }
             `, { contentId: resource.id, columnId: column.id })
+
+            logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
+            await updateRuleCard(context, lastCardId, cardId, column.id)
           }
         }
       } else {
@@ -153,7 +169,7 @@ module.exports = (robot) => {
         for (const issueCard of cardsForIssue) {
           const automationRules = extractAutomationRules([issueCard.project]).filter(({ ruleName: rn }) => rn === ruleName)
 
-          for (const { column, ruleArgs } of automationRules) {
+          for (const { column, ruleArgs, lastCardId, cardId } of automationRules) {
             if (await ruleMatcher(logger, context, ruleArgs)) {
               logger.info(`Moving Card ${issueCard.id} for "${issueUrl}" to column ${column.id} because of "${ruleName}" and value: "${ruleArgs}"`)
               await context.github.graphql(`
@@ -163,6 +179,9 @@ module.exports = (robot) => {
                   }
                 }
               `, { cardId: issueCard.id, columnId: column.id })
+
+              logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
+              await updateRuleCard(context, lastCardId, cardId, column.id)
             }
           }
         }
