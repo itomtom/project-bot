@@ -53,23 +53,34 @@ module.exports = function extractAutomationRules (projects) {
   const allCards = new Map()
   projects.forEach((project) => {
     project.columns.nodes.forEach((column) => {
+      let lastCardId = null
+      if (column.lastCards.nodes.length > 1) {
+        lastCardId = column.lastCards.nodes[column.lastCards.nodes.length - 1].id
+      }
+
       column.firstCards.nodes.forEach((card) => {
-        allCards.set(card.id, { card, column })
+        allCards.set(card.id, { card, column, lastCardId })
       })
       column.lastCards.nodes.forEach((card) => {
-        allCards.set(card.id, { card, column })
+        allCards.set(card.id, { card, column, lastCardId })
       })
     })
   })
 
-  allCards.forEach(({ card, column }) => {
+  allCards.forEach(({ card, column, lastCardId }) => {
     const rules = parseMarkdown(card)
     rules.forEach((r) => {
-      automationRules.push({
+      const rule = {
         column,
         ruleName: r.ruleName,
-        ruleArgs: r.ruleArgs
-      })
+        ruleArgs: r.ruleArgs,
+        cardId: card.id
+      }
+
+      if (card.id !== lastCardId) {
+        rule.lastCardId = lastCardId
+      }
+      automationRules.push(rule)
     })
   })
   return automationRules
