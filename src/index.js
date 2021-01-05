@@ -69,15 +69,79 @@ module.exports = (robot) => {
   logger.info(`Starting up`)
 
   // Register all of the automation commands
-  automationCommands.forEach(({ createsACard, webhookName, ruleName, ruleMatcher }) => {
+  automationCommands.forEach(({ createsACard, webhookName, ruleName, ruleMatcher, updateCard }) => {
     logger.trace(`Attaching listener for ${webhookName}`)
     robot.on(webhookName, async function (context) {
-      const issueUrl = context.payload.issue ? context.payload.issue.html_url : context.payload.pull_request.html_url.replace('/pull/', '/issues/')
       logger.trace(`Event received for ${webhookName}`)
+      let issueUrl = ''
+      let projectCardNodeId = ''
+
+      if (context.payload.issue) {
+        // if payload is an issue
+        issueUrl = context.payload.issue.html_url
+      } else if (context.payload.project_card) {
+        // if payload is a project card
+        projectCardNodeId = context.payload.project_card.node_id
+      } else {
+        // if payload is a pull request
+        issueUrl = context.payload.pull_request.html_url.replace('/pull/', '/issues/')
+      }
 
       // A couple commands occur when a new Issue or Pull Request is created.
       // In those cases, a new Card needs to be created, rather than moving an existing card.
-      if (createsACard) {
+
+      // If Project Card Node ID is provided then enter into closing issue
+      if (projectCardNodeId) {
+        const graphResult = await retryQuery(context, `
+        query getColumnCards($projectCardNodeId: ID!) {
+          node(id: $projectCardNodeId) {
+            ... on ProjectCard {
+              content {
+                ... on Issue {
+                  id
+                  closed
+                  number
+                }
+              }
+              column {
+                id
+                url
+                firstCards: cards(first: 1, archivedStates: NOT_ARCHIVED) {
+                  totalCount
+                  nodes {
+                    url
+                    id
+                    note
+                  }
+                }
+                lastCards: cards(last: 2, archivedStates: NOT_ARCHIVED) {
+                  totalCount
+                  nodes {
+                    url
+                    id
+                    note
+                  }
+                }
+              }
+            }
+          }
+        }
+        `, { projectCardNodeId: projectCardNodeId })
+        logger.debug(graphResult, 'Retrieved results')
+
+        const projects = [{ columns: { nodes: [graphResult.node.column] } }]
+        const automationRules = extractAutomationRules(projects).filter(({ ruleName: rn }) => rn === ruleName)
+
+        for (const { column, ruleArgs, lastCardId, cardId } of automationRules) {
+          if (await ruleMatcher(logger, context, ruleArgs)) {
+            if (updateCard) {
+              await updateCard(logger, context, graphResult.node.content)
+            }
+            logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
+            await updateRuleCard(context, lastCardId, cardId, column.id)
+          }
+        }
+      } else if (createsACard) {
         const graphResult = await retryQuery(context, `
           query getAllProjectCards($issueUrl: URI!) {
             resource(url: $issueUrl) {
