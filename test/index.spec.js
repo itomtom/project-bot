@@ -5,7 +5,8 @@ const { Probot } = require('probot')
 
 const pullrequestOpened = require('./fixtures/pull_request.opened.json')
 const issueOpened = require('./fixtures/issue.opened.json')
-const { buildCard, getAllProjectCards, getCardAndColumnAutomationCards } = require('./util')
+const projectCardMoved = require('./fixtures/project_card.moved.json')
+const { buildCard, getAllProjectCards, getCardAndColumnAutomationCards, getColumnCards } = require('./util')
 
 nock.disableNetConnect()
 
@@ -60,10 +61,6 @@ describe('project-bot integration tests', () => {
   })
 
   describe('simple commands', () => {
-    test('closed_issue', async () => {
-      issueOpened.action = 'closed'
-      await checkCommand(true, 1, { closed_issue: true }, 'issues', issueOpened)
-    })
     test('edited_issue', async () => {
       issueOpened.action = 'edited'
       await checkCommand(true, 1, { edited_issue: true }, 'issues', issueOpened)
@@ -238,6 +235,13 @@ describe('project-bot integration tests', () => {
       payload.action = 'unlabeled'
       payload.label = { name: 'testlabel' }
       await checkCommand(false, 1, { removed_label: ['anotherlabel'] }, 'pull_request', payload)
+    })
+  })
+
+  describe('close', () => {
+    test('moving issue to close', async () => {
+      const payload = { ...projectCardMoved }
+      await checkMoveCommand({ close_issue: true }, 'project_card', payload)
     })
   })
 
@@ -418,5 +422,23 @@ describe('project-bot integration tests', () => {
       console.error(nock.pendingMocks())
       expect(nock.isDone()).toEqual(true)
     }
+  }
+
+  const checkMoveCommand = async (card, eventName, payload) => {
+    const automationCards = [[
+      buildCard(card)
+    ]]
+
+    nock('https://api.github.com').post('/graphql').reply(200, (uri, requestBody) => {
+      requestBody = JSON.parse(requestBody)
+      expect(requestBody.query).toContain('query getColumnCards')
+      const r1 = getColumnCards(automationCards)
+      return { data: r1 }
+    })
+
+    // Receive a webhook event
+    await probot.receive({ name: eventName, payload })
+
+    expect(nock.isDone()).toEqual(true)
   }
 })

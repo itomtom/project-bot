@@ -6,7 +6,6 @@ module.exports = [
   { ruleName: 'milestoned_issue', webhookName: 'issues.milestoned', ruleMatcher: ALWAYS_TRUE },
   { ruleName: 'reopened_pullrequest', webhookName: 'pull_request.reopened', ruleMatcher: ALWAYS_TRUE },
   { ruleName: 'reopened_issue', webhookName: 'issues.reopened', ruleMatcher: ALWAYS_TRUE },
-  { ruleName: 'closed_issue', webhookName: 'issues.closed', ruleMatcher: ALWAYS_TRUE },
   { ruleName: 'added_reviewer', webhookName: 'pull_request.review_requested', ruleMatcher: ALWAYS_TRUE }, // See https://developer.github.com/v3/activity/events/types/#pullrequestevent to get the reviewer
   {
     createsACard: true,
@@ -19,6 +18,25 @@ module.exports = [
         return repoNames.indexOf(context.payload.repository.name) >= 0
       } else {
         return true
+      }
+    }
+  },
+  {
+    ruleName: 'close_issue',
+    webhookName: 'project_card.moved',
+    ruleMatcher: ALWAYS_TRUE,
+    updateCard: async function (logger, context, data) {
+      if (!data.closed) {
+        logger.info(`Closing Issue ${data.number}`)
+        const result = await context.github.graphql(`
+          mutation closeCard($issueId: ID!) {
+            closeIssue(input: {issueId: $issueId}) {
+              clientMutationId
+            }
+          }
+        `, { issueId: data.id })
+
+        logger.info(`Result of closing issue: ${result}`)
       }
     }
   },

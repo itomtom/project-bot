@@ -133,9 +133,40 @@ const getCardAndColumnAutomationCards = (repoName, automationCards) => {
   }
 }
 
+const getColumnCards = (automationCards) => {
+  return {
+    node: {
+      content: {
+        id: 'issue-id',
+        close: false,
+        number: '123'
+      },
+      column: {
+        id: 'column-id',
+        url: 'column-url',
+        firstCards: {
+          totalCount: 1,
+          nodes: [{
+            id: 'issue-card-id'
+          }]
+        },
+        lastCards: {
+          totalCount: 1,
+          nodes: [{
+            id: 'card-id',
+            url: 'card-url',
+            note: automationCards[0].note
+          }]
+        }
+      }
+    }
+  }
+}
+
 module.exports = {
   buildCard,
   getCardAndColumnAutomationCards,
   getAllProjectCards,
-  buildOrgGraphQLResponseNew
+  buildOrgGraphQLResponseNew,
+  getColumnCards
 }
