@@ -1,5 +1,6 @@
 const extractAutomationRules = require('./extract-rules')
 const automationCommands = require('./commands')
+const getIssueFromBody = require('./util')
 
 // `await sleep(1000)` syntax
 async function sleep (ms) {
@@ -84,7 +85,21 @@ module.exports = (robot) => {
         projectCardNodeId = context.payload.project_card.node_id
       } else {
         // if payload is a pull request
-        issueUrl = context.payload.pull_request.html_url.replace('/pull/', '/issues/')
+        const graphResult = await retryQuery(context, `
+          query getIssueFromPullRequest($pullRequestUrl: URI!) {
+            resource(url: $pullRequestUrl) {
+              ... on PullRequest {
+                body
+              }
+            }
+          }
+        `, { pullRequestUrl: context.payload.pull_request.html_url })
+
+        if (graphResult && graphResult.resource) {
+          issueUrl = getIssueFromBody(graphResult.resource.body)
+        }
+
+        issueUrl = issueUrl || context.payload.pull_request.html_url.replace('/pull/', '/issues/')
       }
 
       // A couple commands occur when a new Issue or Pull Request is created.
@@ -202,26 +217,26 @@ module.exports = (robot) => {
       } else {
         // Check if we need to move the Issue (or Pull request)
         const graphResult = await retryQuery(context, `
-          query getCardAndColumnAutomationCards($issueUrl: URI!) {
-            resource(url: $issueUrl) {
-              ... on Issue {
-                projectCards(first: 10) {
-                  nodes {
-                    id
-                    url
-                    column {
-                      name
-                      id
-                    }
-                    project {
-                      ${PROJECT_FRAGMENT}
-                    }
-                  }
-                }
-              }
-            }
-          }
-        `, { issueUrl: issueUrl })
+         query getCardAndColumnAutomationCards($issueUrl: URI!) {
+           resource(url: $issueUrl) {
+             ... on Issue {
+               projectCards(first: 10) {
+                 nodes {
+                   id
+                   url
+                   column {
+                     name
+                     id
+                   }
+                   project {
+                     ${PROJECT_FRAGMENT}
+                   }
+                 }
+               }
+             }
+           }
+         }
+       `, { issueUrl: issueUrl })
         logger.debug(graphResult, 'Retrieved results')
         const { resource } = graphResult
         // sometimes there are no projectCards
@@ -237,12 +252,12 @@ module.exports = (robot) => {
             if (await ruleMatcher(logger, context, ruleArgs)) {
               logger.info(`Moving Card ${issueCard.id} for "${issueUrl}" to column ${column.id} because of "${ruleName}" and value: "${ruleArgs}"`)
               await context.github.graphql(`
-                mutation moveCard($cardId: ID!, $columnId: ID!) {
-                  moveProjectCard(input: {cardId: $cardId, columnId: $columnId}) {
-                    clientMutationId
-                  }
-                }
-              `, { cardId: issueCard.id, columnId: column.id })
+               mutation moveCard($cardId: ID!, $columnId: ID!) {
+                 moveProjectCard(input: {cardId: $cardId, columnId: $columnId}) {
+                   clientMutationId
+                 }
+               }
+             `, { cardId: issueCard.id, columnId: column.id })
 
               logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
               await updateRuleCard(context, lastCardId, cardId, column.id)
