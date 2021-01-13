@@ -6,6 +6,7 @@ const { Probot } = require('probot')
 const pullrequestOpened = require('./fixtures/pull_request.opened.json')
 const issueOpened = require('./fixtures/issue.opened.json')
 const projectCardMoved = require('./fixtures/project_card.moved.json')
+const getIssueFromBody = require('../src/util')
 const { buildCard, getAllProjectCards, getCardAndColumnAutomationCards, getColumnCards } = require('./util')
 
 nock.disableNetConnect()
@@ -23,6 +24,10 @@ describe('project-bot integration tests', () => {
 
   test('sanity', async () => {
     const automationCards = [[]]
+
+    nock('https://api.github.com')
+      .post('/graphql')
+      .reply(200)
 
     nock('https://api.github.com')
       .post('/graphql')
@@ -319,10 +324,30 @@ describe('project-bot integration tests', () => {
     })
   })
 
+  describe('util', () => {
+    test('incorrect body for getIssueFromBody', () => {
+      expect(getIssueFromBody('\r\nFixx https://uwu\r\n')).toBe('')
+    })
+
+    test('lowercase fix keyword for getIssueFromBody', () => {
+      expect(getIssueFromBody('\r\nfix https://uwu\r\n')).toBe('https://uwu')
+    })
+
+    test('uppercase Fix keyword for getIssueFromBody', () => {
+      expect(getIssueFromBody('\r\nFix https://uwu\r\n')).toBe('https://uwu')
+    })
+  })
+
   const checkNewCommand = async (createsACard, card, eventName, payload) => {
     const automationCards = [[
       buildCard(card)
     ]]
+
+    if (eventName === 'pull_request') {
+      nock('https://api.github.com')
+        .post('/graphql')
+        .reply(200)
+    }
 
     // query getAllProjectCards
     nock('https://api.github.com')
@@ -349,6 +374,24 @@ describe('project-bot integration tests', () => {
 
     // query getCardAndColumnAutomationCards
     const r1 = { data: getCardAndColumnAutomationCards('repo-name', automationCards) }
+
+    for (let i = 0; i < numGetCard; i++) {
+      if (eventName === 'pull_request') {
+        nock('https://api.github.com')
+          .post('/graphql')
+          .reply(200, (uri, requestBody) => {
+            requestBody = JSON.parse(requestBody)
+            expect(requestBody.query).toContain('query getIssueFromPullRequest')
+            expect(requestBody.variables.pullRequestUrl).toBeTruthy()
+            return { data: {
+              resource: {
+                body: '\r\n\r\nfix https://api.github.com/repos/my-org-name/my-repo-name/issues/113\r\n\r\n'
+              }
+            } }
+          })
+      }
+    }
+
     for (let i = 0; i < numGetCard; i++) {
       nock('https://api.github.com')
         .post('/graphql')
@@ -385,6 +428,12 @@ describe('project-bot integration tests', () => {
     const automationCards = [[
       buildCard(card)
     ]]
+
+    if (eventName === 'pull_request_review') {
+      nock('https://api.github.com')
+        .post('/graphql')
+        .reply(200)
+    }
 
     // query getCardAndColumnAutomationCards
     const r1 = { data: getCardAndColumnAutomationCards('repo-name', automationCards) }
