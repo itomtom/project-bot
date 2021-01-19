@@ -190,7 +190,7 @@ describe('project-bot integration tests', () => {
       const payload = { ...issueOpened }
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
-      await checkCommand(true, 1, { added_label: ['testlabel'] }, 'issues', payload)
+      await checkCommand(true, 2, { added_label: ['testlabel'] }, 'issues', payload)
     })
 
     test('added_label (pullrequest)', async () => {
@@ -204,7 +204,7 @@ describe('project-bot integration tests', () => {
       const payload = { ...issueOpened }
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
-      await checkCommand(false, 1, { added_label: ['anotherlabel'] }, 'issues', payload)
+      await checkCommand(false, 2, { added_label: ['anotherlabel'] }, 'issues', payload)
     })
 
     test('added_label (pullrequest) (unsatisfied)', async () => {
@@ -294,7 +294,7 @@ describe('project-bot integration tests', () => {
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
 
-      await checkCommand(false, 1, null, 'issues', payload)
+      await checkCommand(false, 2, null, 'issues', payload)
     })
 
     test('parses backwards-compatible cards', async () => {
@@ -302,7 +302,7 @@ describe('project-bot integration tests', () => {
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
 
-      await checkCommand(true, 1, `###### Automation Rules
+      await checkCommand(true, 2, `###### Automation Rules
 
 <!-- Documentation: https://github.com/philschatz/project-bot -->
 
@@ -315,12 +315,20 @@ describe('project-bot integration tests', () => {
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
 
-      await checkCommand(false, 1, `###### Automation Rules
+      await checkCommand(false, 2, `###### Automation Rules
   
   <!-- Documentation: https://github.com/philschatz/project-bot -->
   
   ** \`added_label\` ** testlabel
   `, 'issues', payload)
+    })
+
+    test('add_close_issue for Done column', async () => {
+      const payload = { ...issueOpened }
+      payload.action = 'labeled'
+      payload.label = { name: 'testlabel' }
+
+      await checkCommand(true, 2, { add_close_issue: ['Done'] }, 'issues', payload, 'Done')
     })
   })
 
@@ -367,13 +375,13 @@ describe('project-bot integration tests', () => {
     expect(nock.isDone()).toEqual(true)
   }
 
-  const checkCommand = async (shouldMove, numGetCard, card, eventName, payload) => {
+  const checkCommand = async (shouldMove, numGetCard, card, eventName, payload, columnName) => {
     const automationCards = [[
       typeof card === 'string' ? card : buildCard(card)
     ]]
 
     // query getCardAndColumnAutomationCards
-    const r1 = { data: getCardAndColumnAutomationCards('repo-name', automationCards) }
+    const r1 = { data: getCardAndColumnAutomationCards('repo-name', automationCards, columnName) }
 
     for (let i = 0; i < numGetCard; i++) {
       if (eventName === 'pull_request') {
@@ -412,6 +420,16 @@ describe('project-bot integration tests', () => {
           expect(requestBody.query).toContain('mutation moveCard')
           expect(requestBody.variables.cardId).toBeTruthy()
           expect(requestBody.variables.columnId).toBeTruthy()
+        })
+    }
+
+    if (columnName) {
+      // mutation addCard
+      nock('https://api.github.com')
+        .post('/graphql')
+        .reply(200, (uri, requestBody) => {
+          requestBody = JSON.parse(requestBody)
+          expect(requestBody.query).toContain('mutation addCard')
         })
     }
 

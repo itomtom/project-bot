@@ -119,6 +119,31 @@ module.exports = [
     }
   },
   {
+    ruleName: 'add_close_issue',
+    webhookName: 'issues.labeled',
+    ruleMatcher: ALWAYS_TRUE,
+    updateCard: async function (logger, context, data, args) {
+      const CLOSE_PROJECT_CARD = '###### Automation Rules\r\n\r\n<!-- Documentation: https://github.com/philschatz/project-bot -->\r\n\r\n- `close_issue`'
+
+      logger.info(`Adding close issue rule card`)
+      const cardsForIssue = data.projectCards ? data.projectCards.nodes : []
+      for (const issueCard of cardsForIssue) {
+        const column = issueCard.project.columns.nodes.find(({ name }) => name === args.ruleArgs[0])
+        if (column && column.firstCards.nodes.concat(column.lastCards.nodes).every(({ note }) => note !== CLOSE_PROJECT_CARD)) {
+          const result = await context.github.graphql(`
+            mutation addCard($note: String!, $projectColumnId: ID!) {
+              addProjectCard(input: {note: $note, projectColumnId: $projectColumnId}) {
+                clientMutationId
+              }
+            }
+          `, { note: CLOSE_PROJECT_CARD, projectColumnId: column.id })
+
+          logger.info(`Result of adding project card: ${result}`)
+        }
+      }
+    }
+  },
+  {
     ruleName: 'added_label',
     webhookName: 'pull_request.labeled',
     ruleMatcher: async function (logger, context, ruleArgs) {
