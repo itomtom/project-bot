@@ -29,7 +29,7 @@ const buildCard = (rules) => {
   ${[...m.entries()].map(buildEntry).join('\n')}
 `
 }
-const buildProject = (name, cardsInColumns) => {
+const buildProject = (name, cardsInColumns, columnName) => {
   let id = 1
   const freshId = () => {
     id += 1
@@ -52,6 +52,7 @@ const buildProject = (name, cardsInColumns) => {
         })
         return {
           id,
+          name: columnName || '',
           url: `column-url-${id}`,
           firstCards: {
             totalCount: cards.length,
@@ -113,7 +114,7 @@ const buildOrgGraphQLResponseNew = (repoName, cards) => {
 //     }
 //   }
 // }
-const getCardAndColumnAutomationCards = (repoName, automationCards) => {
+const getCardAndColumnAutomationCards = (repoName, automationCards, columnName) => {
   return {
     resource: {
       projectCards: {
@@ -125,7 +126,7 @@ const getCardAndColumnAutomationCards = (repoName, automationCards) => {
               name: 'column-name',
               id: 'column-id'
             },
-            project: buildProject(`project-${repoName}`, automationCards)
+            project: buildProject(`project-${repoName}`, automationCards, columnName)
           }
         ]
       }

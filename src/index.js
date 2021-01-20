@@ -41,6 +41,7 @@ const PROJECT_FRAGMENT = `
     totalCount
     nodes {
       id
+      name
       url
       firstCards: cards(first: 1, archivedStates: NOT_ARCHIVED) {
         totalCount
@@ -258,6 +259,10 @@ module.exports = (robot) => {
                  }
                }
              `, { cardId: issueCard.id, columnId: column.id })
+
+              if (updateCard) {
+                await updateCard(logger, context, resource, { ruleArgs })
+              }
 
               logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
               await updateRuleCard(context, lastCardId, cardId, column.id)
