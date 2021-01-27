@@ -328,7 +328,7 @@ describe('project-bot integration tests', () => {
       payload.action = 'labeled'
       payload.label = { name: 'testlabel' }
 
-      await checkCommand(true, 2, { add_close_issue: ['Done'] }, 'issues', payload, 'Done')
+      await checkCommand(false, 2, { add_close_issue: ['Done'] }, 'issues', payload, 'Done')
     })
   })
 
@@ -430,6 +430,13 @@ describe('project-bot integration tests', () => {
         .reply(200, (uri, requestBody) => {
           requestBody = JSON.parse(requestBody)
           expect(requestBody.query).toContain('mutation addCard')
+        })
+
+      nock('https://api.github.com')
+        .post('/graphql')
+        .reply(200, (uri, requestBody) => {
+          requestBody = JSON.parse(requestBody)
+          expect(requestBody.query).toContain('mutation moveCard')
         })
     }
 

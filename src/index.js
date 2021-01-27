@@ -251,21 +251,23 @@ module.exports = (robot) => {
 
           for (const { column, ruleArgs, lastCardId, cardId } of automationRules) {
             if (await ruleMatcher(logger, context, ruleArgs)) {
-              logger.info(`Moving Card ${issueCard.id} for "${issueUrl}" to column ${column.id} because of "${ruleName}" and value: "${ruleArgs}"`)
-              await context.github.graphql(`
-               mutation moveCard($cardId: ID!, $columnId: ID!) {
-                 moveProjectCard(input: {cardId: $cardId, columnId: $columnId}) {
-                   clientMutationId
-                 }
-               }
-             `, { cardId: issueCard.id, columnId: column.id })
-
               if (updateCard) {
-                await updateCard(logger, context, resource, { ruleArgs })
-              }
+                const { columnId, lastCardInCloseColumnId, closeCardId } = await updateCard(logger, context, resource, { ruleArgs })
+                logger.info(`Moving Rule Card ${closeCardId} to bottom of column ${columnId}`)
+                await updateRuleCard(context, lastCardInCloseColumnId, closeCardId, columnId)
+              } else {
+                logger.info(`Moving Card ${issueCard.id} for "${issueUrl}" to column ${column.id} because of "${ruleName}" and value: "${ruleArgs}"`)
+                await context.github.graphql(`
+                 mutation moveCard($cardId: ID!, $columnId: ID!) {
+                   moveProjectCard(input: {cardId: $cardId, columnId: $columnId}) {
+                     clientMutationId
+                   }
+                 }
+               `, { cardId: issueCard.id, columnId: column.id })
 
-              logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
-              await updateRuleCard(context, lastCardId, cardId, column.id)
+                logger.info(`Moving Rule Card ${cardId} to bottom of column ${column.id}`)
+                await updateRuleCard(context, lastCardId, cardId, column.id)
+              }
             }
           }
         }
