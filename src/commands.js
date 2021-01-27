@@ -26,7 +26,7 @@ module.exports = [
     webhookName: 'project_card.moved',
     ruleMatcher: ALWAYS_TRUE,
     updateCard: async function (logger, context, data) {
-      if (!data.closed) {
+      if (data && !data.closed) {
         logger.info(`Closing Issue ${data.number}`)
         const result = await context.github.graphql(`
           mutation closeCard($issueId: ID!) {
@@ -133,12 +133,22 @@ module.exports = [
           const result = await context.github.graphql(`
             mutation addCard($note: String!, $projectColumnId: ID!) {
               addProjectCard(input: {note: $note, projectColumnId: $projectColumnId}) {
-                clientMutationId
+                cardEdge {
+                  node {
+                    id
+                  }
+                }
               }
             }
           `, { note: CLOSE_PROJECT_CARD, projectColumnId: column.id })
 
           logger.info(`Result of adding project card: ${result}`)
+          const closeCardId = result ? result.addProjectCard.cardEdge.node.id : null
+          return {
+            columnId: column.id,
+            closeCardId,
+            lastCardInCloseColumnId: column.lastCards.nodes[column.lastCards.nodes.length - 1].id
+          }
         }
       }
     }
