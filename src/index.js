@@ -168,7 +168,12 @@ module.exports = (robot) => {
                     url
                     ${''/* Projects can be attached to an Organization... */}
                     ... on Organization {
-                      projects(first: 10, states: [OPEN]) {
+                      firstUpdatedTen: projects(first: 10, states: [OPEN], orderBy: {direction: DESC, field: UPDATED_AT}) {
+                        nodes {
+                          ${PROJECT_FRAGMENT}
+                        }
+                      }
+                      firstTenMatch: projects(first: 20, states: [OPEN], search: "auto") {
                         nodes {
                           ${PROJECT_FRAGMENT}
                         }
@@ -189,13 +194,18 @@ module.exports = (robot) => {
         const { resource } = graphResult
 
         let allProjects = []
-        if (resource.repository.owner.projects) {
+        if (resource.repository.owner.firstUpdatedTen) {
           // Add Org Projects
-          allProjects = allProjects.concat(resource.repository.owner.projects.nodes)
+          allProjects = allProjects.concat(resource.repository.owner.firstUpdatedTen.nodes)
+        }
+        if (resource.repository.owner.firstTenMatch) {
+          // Add Org Projects
+          allProjects = allProjects.concat(resource.repository.owner.firstTenMatch.nodes)
         }
         if (resource.repository.projects) {
           allProjects = allProjects.concat(resource.repository.projects.nodes)
         }
+        allProjects = [...new Map(allProjects.map(item => [item['id'], item])).values()];
 
         // Loop through all of the Automation Cards and see if any match
         const automationRules = extractAutomationRules(allProjects).filter(({ ruleName: rn }) => rn === ruleName)
