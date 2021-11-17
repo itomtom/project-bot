@@ -11,21 +11,13 @@ module.exports = [
     createsACard: true,
     ruleName: 'new_issue',
     webhookName: 'issues.opened',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      if (ruleArgs.length > 0) {
-        // Verify that it matches one of the repositories listed
-        const repoNames = ruleArgs
-        return repoNames.indexOf(context.payload.repository.name) >= 0
-      } else {
-        return true
-      }
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (ruleArgs.length > 0) ? ruleArgs.indexOf(context.payload.repository.name) >= 0 : true
   },
   {
     ruleName: 'close_issue',
     webhookName: 'project_card.moved',
-    ruleMatcher: ALWAYS_TRUE,
-    updateCard: async function (logger, context, data) {
+    ruleMatcher: async (_, context, ruleArgs) => (ruleArgs.length > 0) ? ruleArgs.indexOf(context.payload.repository.name) >= 0 : true,
+    updateCard: async (logger, context, data) => {
       if (data && !data.closed) {
         logger.info(`Closing Issue ${data.number}`)
         const result = await context.github.graphql(`
@@ -44,37 +36,22 @@ module.exports = [
     createsACard: true,
     ruleName: 'new_pullrequest',
     webhookName: 'pull_request.opened',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      if (ruleArgs.length > 0) {
-        // Verify that it matches one of the repositories listed
-        const repoNames = ruleArgs
-
-        return repoNames.indexOf(context.payload.repository.name) >= 0
-      } else {
-        return true
-      }
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (ruleArgs.length > 0) ? ruleArgs.indexOf(context.payload.repository.name) >= 0 : true
   },
   {
     ruleName: 'merged_pullrequest',
     webhookName: 'pull_request.closed',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      // see https://developer.github.com/v3/activity/events/types/#pullrequestevent
-      return !!context.payload.pull_request.merged
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => !!context.payload.pull_request.merged
   },
   {
     ruleName: 'closed_pullrequest',
     webhookName: 'pull_request.closed',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      // see https://developer.github.com/v3/activity/events/types/#pullrequestevent
-      return !context.payload.pull_request.merged
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => !!context.payload.pull_request.merged
   },
   {
     ruleName: 'assigned_to_issue',
     webhookName: 'issues.assigned',
-    ruleMatcher: async function (logger, context, ruleArgs) {
+    ruleMatcher: async (logger, context, ruleArgs) => {
       if (ruleArgs[0] !== true) {
         return context.payload.assignee.login === ruleArgs[0]
       } else {
@@ -85,45 +62,35 @@ module.exports = [
   {
     ruleName: 'assigned_issue',
     webhookName: 'issues.assigned',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.issue.assignees.length === 1
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => context.payload.issue.assignees.length === 1
   },
   {
     ruleName: 'unassigned_issue',
     webhookName: 'issues.unassigned',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.issue.assignees.length === 0
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => context.payload.issue.assignees.length === 0
   },
   {
     ruleName: 'assigned_pullrequest',
     webhookName: 'pull_request.assigned',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.pull_request.assignees.length === 1
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => context.payload.pull_request.assignees.length === 1
   },
   {
     ruleName: 'unassigned_pullrequest',
     webhookName: 'pull_request.unassigned',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.pull_request.assignees.length === 0
-    }
+    ruleMatcher: async (_, context, _ruleArgs) => context.payload.pull_request.assignees.length === 0
   },
   {
     ruleName: 'added_label',
     webhookName: 'issues.labeled',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      // labels may be defined by a label or an id (for more persistence)
-      return context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0]
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0])
   },
   {
     ruleName: 'add_close_issue',
     webhookName: 'issues.labeled',
     ruleMatcher: ALWAYS_TRUE,
-    updateCard: async function (logger, context, data, args) {
-      const CLOSE_PROJECT_CARD = '###### Automation Rules\r\n\r\n<!-- Documentation: https://github.com/philschatz/project-bot -->\r\n\r\n- `close_issue`'
+    updateCard: async (logger, context, data, args) => {
+      const repos = args.ruleArgs.slice(1).map(repo => `**${repo}**`).join(' ')
+      const CLOSE_PROJECT_CARD = '###### Automation Rules\r\n\r\n<!-- Documentation: https://github.com/philschatz/project-bot -->\r\n\r\n- `close_issue` ' + repos
 
       logger.info(`Adding close issue rule card`)
       const cardsForIssue = data.projectCards ? data.projectCards.nodes : []
@@ -156,29 +123,22 @@ module.exports = [
   {
     ruleName: 'added_label',
     webhookName: 'pull_request.labeled',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      // labels may be defined by a label or an id (for more persistence)
-      return context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0]
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0])
   },
   {
     ruleName: 'removed_label',
     webhookName: 'issues.unlabeled',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0]
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0])
   },
   {
     ruleName: 'removed_label',
     webhookName: 'pull_request.unlabeled',
-    ruleMatcher: async function (logger, context, ruleArgs) {
-      return context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0]
-    }
+    ruleMatcher: async (_, context, ruleArgs) => (context.payload.label.name === ruleArgs[0] || context.payload.label.id === ruleArgs[0])
   },
   {
     ruleName: 'accepted_pullrequest',
     webhookName: 'pull_request_review.submitted',
-    ruleMatcher: async function (logger, context, ruleArgs) {
+    ruleMatcher: async (_, context, _ruleArgs) => {
       // See https://developer.github.com/v3/activity/events/types/#pullrequestreviewevent
       // Check if there are any Pending or Rejected reviews and ensure there is at least one Accepted one
       const issue = context.issue()
