@@ -16,7 +16,7 @@ module.exports = [
   {
     ruleName: 'close_issue',
     webhookName: 'project_card.moved',
-    ruleMatcher: async (_, context, ruleArgs) => (ruleArgs.length > 0) ? ruleArgs.indexOf(context.payload.repository.name) >= 0 : true,
+    ruleMatcher: ALWAYS_TRUE,
     updateCard: async (logger, context, data) => {
       if (data && !data.closed) {
         logger.info(`Closing Issue ${data.number}`)
